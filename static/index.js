@@ -1,5 +1,18 @@
 
 
+const openNav = () => document.getElementById("side-nav").style.width = "250px";
+
+const closeNav = () => document.getElementById("side-nav").style.width = "0";
+
+const showToast = () => {
+    console.log('asd')
+    var x = document.getElementById("snackbar");
+  
+    x.className = "show";
+  
+    setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
+  }
+
 
 const submit = (event, socket) => {
     event.preventDefault(event);
@@ -7,8 +20,7 @@ const submit = (event, socket) => {
     const name = document.getElementById('name').value;
     const message = document.getElementById('message').value;
 
-    console.log(name)
-    console.log(message)
+
     const canSubmit = name != "" && message != "" && true || false
     if (canSubmit) {
         const a = { name, action: "broadcast", message }
@@ -18,51 +30,77 @@ const submit = (event, socket) => {
 
 }
 
-const openNav = () => document.getElementById("side-nav").style.width = "250px";
 
-const closeNav = () => document.getElementById("side-nav").style.width = "0";
+const handleConnectionUpdateNotification = (clients) => {
+    const list = document.createElement('ul');
+    clients.forEach(client => {
+        const li = document.createElement('li');
+        li.classList = ["online"];
 
-const handleConnectionEventMessages = (messages) => {
-    var list = document.createElement('ul');
-    messages.forEach(({ message, name, action }) => {
+        const h = document.createElement('H4');
+        const t = document.createTextNode(`${client} connected...`);
+        h.appendChild(t);
+        li.appendChild(h);
+        list.appendChild(li);
+    });
+    document.querySelector('#online-items').innerHTML = list.innerHTML
 
-        if (action === "connected") {
 
-            var li = document.createElement('li');
-            li.classList = ["online"];
+    openNav()
+    const timeout = setTimeout(() => {
+        closeNav()
+        clearTimeout(timeout)
+    }, 2000)
 
+}
+const handleConnectionEvents = ({ message, name, action, clients }) => {
 
-            var h = document.createElement('H4');
+    switch (action) {
+        case "connected":
+            if (message === `The name \"${name}\" is taken!`) {
+                document.getElementById("snackbar").innerHTML = message;
+                showToast()
+            }
+            handleConnectionUpdateNotification(clients)
+            break;
+        case "disconnected":
+            handleConnectionUpdateNotification(clients)
+        case "broadcast":
+            const li = document.createElement('li');
+            li.id = "list-item";
+            const userName = document.getElementById('name').value;
+            if (name === userName) {
+                li.classList = ["home"];
+            } else {
+                li.classList = ["away"];
+            }
+
+            const h = document.createElement('H4');
             let t = document.createTextNode(`${name}: `);
             h.appendChild(t);
 
 
-            var p = document.createElement('p');
+            const p = document.createElement('p');
             t = document.createTextNode(message);
             p.appendChild(t);
 
-
-            p.textContent = message;
-
             li.appendChild(h);
             li.appendChild(p);
-            list.appendChild(li)
-        }
-    });
-    document.querySelector('#online-items').appendChild(list);
-    // document.querySelector('#online').innerHTML = list.innerHTML;
+
+            document.querySelector('#messages').appendChild(li);
+            break;
+        default:
+            break;
+    }
 }
 
 const main = () => {
     const socket = new WebSocket('ws://localhost:8080/ws');
     const nameInputField = document.getElementById('name');
-    const messages = []
 
 
     socket.addEventListener('message', (event) => {
-        const data = event.data
-        messages.push(JSON.parse(data))
-        handleConnectionEventMessages(messages)
+        handleConnectionEvents(JSON.parse(event.data))
     });
 
     nameInputField.addEventListener("change", () => {
@@ -78,7 +116,7 @@ const main = () => {
         .addEventListener('submit', (event) => submit(event, socket));
 
     window.onbeforeunload = () => {
-        const a = { name, action: "disconnected", message: "goodby from client" }
+        const a = { name: nameInputField.value, action: "disconnected", message: "goodby from client" }
         const b = JSON.stringify(a)
         socket.send(b);
         socket.close()
