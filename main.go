@@ -30,7 +30,7 @@ func SafeBroadcast(
 ) {
 	mutex.Lock()
 	for conn := range *wsConnMap {
-		(*broadcasterPacket).Payload.Clients = util.GetKeys(wsConnMap)
+		(*broadcasterPacket).Payload.Clients = util.GetClients(wsConnMap)
 		err := conn.WriteJSON(*broadcasterPacket.Payload)
 		if err != nil {
 			log.Println(err)
@@ -39,6 +39,24 @@ func SafeBroadcast(
 		}
 	}
 	mutex.Unlock()
+}
+
+func SafeBroadcastUserHasDupName(
+	wsConnMap *map[*websocket.Conn]*string,
+	mutex *sync.Mutex,
+	broadcasterPacket *BroadcasterPacket,
+) {
+	broadcasterPacket.Payload.Message = fmt.Sprintf("The name \"%s\" is taken!", broadcasterPacket.Payload.Name)
+
+	mutex.Lock()
+	delete(*wsConnMap, broadcasterPacket.WsConnection)
+	broadcasterPacket.Payload.Clients = util.GetClients(wsConnMap)
+	mutex.Unlock()
+
+	err := (*broadcasterPacket).WsConnection.WriteJSON(broadcasterPacket.Payload)
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func broadcaster(
@@ -51,19 +69,26 @@ func broadcaster(
 
 		switch broadcasterPacket.Payload.Action {
 		case "connected":
-			if !*util.KeyInMap(wsConnMap, &broadcasterPacket.Payload.Name) {
+			if *util.KeyInMap(wsConnMap, &broadcasterPacket.Payload.Name) {
+				SafeBroadcastUserHasDupName(
+					wsConnMap,
+					mutex,
+					&broadcasterPacket,
+				)
+			} else {
 
 				mutex.Lock()
 				(*wsConnMap)[broadcasterPacket.WsConnection] = &broadcasterPacket.Payload.Name
 				mutex.Unlock()
 
 				broadcasterPacket.Payload.Message = fmt.Sprintf("%s, connected....", broadcasterPacket.Payload.Name)
+
+				SafeBroadcast(
+					wsConnMap,
+					mutex,
+					&broadcasterPacket,
+				)
 			}
-			SafeBroadcast(
-				wsConnMap,
-				mutex,
-				&broadcasterPacket,
-			)
 
 		case "broadcast":
 			SafeBroadcast(

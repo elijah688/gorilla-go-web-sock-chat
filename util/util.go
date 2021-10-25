@@ -13,7 +13,7 @@ func KeyInMap(connMap *map[*websocket.Conn]*string, key *string) *bool {
 	return &result
 }
 
-func GetKeys(connMap *map[*websocket.Conn]*string) []string {
+func GetClients(connMap *map[*websocket.Conn]*string) []string {
 	var conns []string
 	for _, conn := range *connMap {
 		conns = append(conns, *conn)
