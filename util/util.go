@@ -2,10 +2,10 @@ package util
 
 import "github.com/gorilla/websocket"
 
-func KeyInMap(connMap *map[string]*websocket.Conn, key *string) *bool {
+func KeyInMap(connMap *map[*websocket.Conn]*string, key *string) *bool {
 	var result bool = false
-	for currentKey := range *connMap {
-		if *key == currentKey {
+	for _, currentKey := range *connMap {
+		if *key == *currentKey {
 			result = true
 			return &result
 		}
@@ -13,10 +13,10 @@ func KeyInMap(connMap *map[string]*websocket.Conn, key *string) *bool {
 	return &result
 }
 
-func GetKeys(connMap *map[string]*websocket.Conn) []string {
+func GetKeys(connMap *map[*websocket.Conn]*string) []string {
 	var conns []string
-	for conn := range *connMap {
-		conns = append(conns, conn)
+	for _, conn := range *connMap {
+		conns = append(conns, *conn)
 	}
 	return conns
 }

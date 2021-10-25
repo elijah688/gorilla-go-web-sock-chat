@@ -24,33 +24,26 @@ type BroadcasterPacket struct {
 }
 
 func SafeBroadcast(
-	wsConnMap *map[string]*websocket.Conn,
+	wsConnMap *map[*websocket.Conn]*string,
 	mutex *sync.Mutex,
 	broadcasterPacket *BroadcasterPacket,
 ) {
-	log.Println("map before delete")
-	log.Println(wsConnMap)
 	mutex.Lock()
-	for name, conn := range *wsConnMap {
+	for conn := range *wsConnMap {
 		(*broadcasterPacket).Payload.Clients = util.GetKeys(wsConnMap)
 		err := conn.WriteJSON(*broadcasterPacket.Payload)
 		if err != nil {
 			log.Println(err)
 			conn.Close()
-			delete(*wsConnMap, name)
-			log.Println("Deleting....")
-			log.Println(name)
+			delete(*wsConnMap, conn)
 		}
 	}
 	mutex.Unlock()
-	log.Println("map after delete")
-	log.Println(wsConnMap)
-
 }
 
 func broadcaster(
 	broacPackChan *chan *BroadcasterPacket,
-	wsConnMap *map[string]*websocket.Conn,
+	wsConnMap *map[*websocket.Conn]*string,
 	mutex *sync.Mutex,
 ) {
 	for {
@@ -58,17 +51,14 @@ func broadcaster(
 
 		switch broadcasterPacket.Payload.Action {
 		case "connected":
-			if *util.KeyInMap(wsConnMap, &broadcasterPacket.Payload.Name) {
-				broadcasterPacket.Payload.Message = "Sorry, client! Somebody's got that name already"
-				// broadcasterPacket.WsConnection.Close()
-			} else {
-				mutex.Lock()
-				(*wsConnMap)[broadcasterPacket.Payload.Name] = broadcasterPacket.WsConnection
-				mutex.Unlock()
-				broadcasterPacket.Payload.Message = fmt.Sprintf("%s,connected....", broadcasterPacket.Payload.Name)
+			if !*util.KeyInMap(wsConnMap, &broadcasterPacket.Payload.Name) {
 
+				mutex.Lock()
+				(*wsConnMap)[broadcasterPacket.WsConnection] = &broadcasterPacket.Payload.Name
+				mutex.Unlock()
+
+				broadcasterPacket.Payload.Message = fmt.Sprintf("%s, connected....", broadcasterPacket.Payload.Name)
 			}
-			broadcasterPacket.Payload.Clients = util.GetKeys(wsConnMap)
 			SafeBroadcast(
 				wsConnMap,
 				mutex,
@@ -82,7 +72,7 @@ func broadcaster(
 				&broadcasterPacket,
 			)
 		case "disconnected":
-			delete(*wsConnMap, broadcasterPacket.Payload.Name)
+			delete(*wsConnMap, broadcasterPacket.WsConnection)
 			SafeBroadcast(
 				wsConnMap,
 				mutex,
@@ -95,7 +85,7 @@ func broadcaster(
 func ConnecitonManager(
 	conn *websocket.Conn,
 	broacPackChan *chan *BroadcasterPacket,
-	wsConnMap *map[string]*websocket.Conn,
+	wsConnMap *map[*websocket.Conn]*string,
 ) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -121,7 +111,7 @@ func Handler(
 	r *http.Request,
 	upgrader *websocket.Upgrader,
 	broadPackChan *chan *BroadcasterPacket,
-	wsConnMap *map[string]*websocket.Conn,
+	wsConnMap *map[*websocket.Conn]*string,
 ) {
 	conn, err := upgrader.Upgrade(*w, r, nil)
 	if err != nil {
@@ -135,7 +125,7 @@ func Handler(
 
 }
 func main() {
-	var wsConnMap *map[string]*websocket.Conn = &map[string]*websocket.Conn{}
+	var wsConnMap *map[*websocket.Conn]*string = &map[*websocket.Conn]*string{}
 	var broadPackChan chan *BroadcasterPacket = make(chan *BroadcasterPacket)
 	var upgrader *websocket.Upgrader = &websocket.Upgrader{
 		ReadBufferSize:  1024,

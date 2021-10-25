@@ -38,8 +38,16 @@ const main = () => {
             document.getElementById("chat-form")
                 .addEventListener('submit', (event) => submit(event, socket, name));
 
+            window.onbeforeunload = () => {
+                const a = { name, action: "disconnected", message: "hello server" }
+                const b = JSON.stringify(a)
+                socket.send(b);
+                socket.close()
+            }
         }
     })
+
+
 
 }
 
